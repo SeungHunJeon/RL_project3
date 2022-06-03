@@ -1,0 +1,15 @@
+environment:
+  domain: 'walker'
+  seed: 0
+  task: 'run'
+
+replay:
+  replay_size: 1000000
+
+learning:
+  batch_size: 256
+  gradient_step: 1
+
+architecture:
+  policy_net: [128, 128]
+  Q_net: [128, 128]
