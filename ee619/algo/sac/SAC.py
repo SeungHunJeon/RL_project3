@@ -61,7 +61,7 @@ class SAC:
 
     def observe(self, actor_obs):
         self.actor_obs = torch.FloatTensor(actor_obs).to(self.device)
-        self.actions, self.actions_log_prob, _ = self.actor.sample(self.actor_obs)
+        self.actions, self.actions_log_prob = self.actor.sample(self.actor_obs)
 
         return self.actions.cpu().numpy()
 
@@ -74,7 +74,7 @@ class SAC:
         next_state_batch = torch.FloatTensor(np.array(mini_batch.next_state)).to(self.device)
 
         with torch.no_grad():
-            next_state_action, next_state_log_pi, _ = self.actor.sample(next_state_batch)
+            next_state_action, next_state_log_pi = self.actor.sample(next_state_batch)
             qf1_next_target, qf2_next_target = self.critic_target.architecture(next_state_batch, next_state_action)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
             next_q_value = reward_batch + self.gamma * (min_qf_next_target)
@@ -90,7 +90,7 @@ class SAC:
         self.critic_optimizer.step()
 
         # For actor
-        pi, log_pi, _ = self.actor.sample(state_batch)
+        pi, log_pi = self.actor.sample(state_batch)
         qf1_pi, qf2_pi = self.critic.architecture(state_batch, pi)
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
         policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()

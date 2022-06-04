@@ -4,36 +4,6 @@ import numpy as np
 from torch.distributions import Normal
 import torch.nn.functional as F
 
-class Actor(nn.Module):
-    def __init__(self, architecture, distribution, device='cpu', action_space=None):
-        super(Actor, self).__init__()
-        self.architecture = architecture
-        self.distribution = distribution
-        self.device = device
-        self.architecture.to(device)
-        self.distribution.to(device)
-        self.action_space = action_space
-        self.loc_action = self.action_space.loc_action.to(device)
-        self.scale_action = self.action_space.scale_action.to(device)
-
-    def sample(self, obs):
-        return self.architecture.sample(obs)
-
-    def evaluate(self, obs, actions):
-        action_mean = self.architecture(obs)
-        return self.distribution.evaluate(obs, action_mean, actions)
-
-    def parameters(self):
-        return [*self.architecture.parameters(), *self.distribution.parameters()]
-
-    @property
-    def obs_shape(self):
-        return self.architecture.input_shape
-
-    @property
-    def action_shape(self):
-        return self.architecture.output_shape
-
 # class Actor(nn.Module):
 #     def __init__(self, architecture, distribution, device='cpu', action_space=None):
 #         super(Actor, self).__init__()
@@ -47,15 +17,10 @@ class Actor(nn.Module):
 #         self.scale_action = self.action_space.scale_action.to(device)
 #
 #     def sample(self, obs):
-#         logits = self.architecture.architecture(obs)
-#         actions, log_prob = self.distribution.sample(logits)
-#         actions = self.loc_action + self.scale_action * actions
-#         log_prob = log_prob.sum(-1, keepdim=True)
-#         # return actions.cpu().detach(), log_prob.cpu().detach()
-#         return actions, log_prob
+#         return self.architecture.sample(obs)
 #
 #     def evaluate(self, obs, actions):
-#         action_mean = self.architecture.architecture(obs)
+#         action_mean = self.architecture(obs)
 #         return self.distribution.evaluate(obs, action_mean, actions)
 #
 #     def parameters(self):
@@ -68,6 +33,41 @@ class Actor(nn.Module):
 #     @property
 #     def action_shape(self):
 #         return self.architecture.output_shape
+
+class Actor(nn.Module):
+    def __init__(self, architecture, distribution, device='cpu', action_space=None):
+        super(Actor, self).__init__()
+        self.architecture = architecture
+        self.distribution = distribution
+        self.device = device
+        self.architecture.to(device)
+        self.distribution.to(device)
+        self.action_space = action_space
+        self.loc_action = self.action_space.loc_action.to(device)
+        self.scale_action = self.action_space.scale_action.to(device)
+
+    def sample(self, obs):
+        logits = self.architecture.architecture(obs)
+        actions, log_prob = self.distribution.sample(logits)
+        actions = self.loc_action + self.scale_action * actions
+        log_prob = log_prob.sum(-1, keepdim=True)
+        # return actions.cpu().detach(), log_prob.cpu().detach()
+        return actions, log_prob
+
+    def evaluate(self, obs, actions):
+        action_mean = self.architecture.architecture(obs)
+        return self.distribution.evaluate(obs, action_mean, actions)
+
+    def parameters(self):
+        return [*self.architecture.parameters(), *self.distribution.parameters()]
+
+    @property
+    def obs_shape(self):
+        return self.architecture.input_shape
+
+    @property
+    def action_shape(self):
+        return self.architecture.output_shape
 
 class Critic(nn.Module):
     def __init__(self, architecture, device='cpu'):
@@ -88,30 +88,6 @@ class Critic(nn.Module):
     @property
     def obs_shape(self):
         return self.architecture.input_shape
-
-# class Q(nn.Module):
-#     def __init__(self, architecture, device='cpu'):
-#         super(Q, self).__init__()
-#         self.architecture = architecture
-#         self.architecture.to(device)
-#         self.device = device
-#
-#     def predict(self, obs):
-#         return self.architecture.architecture(obs).detach()
-#
-#     def evaluate(self, obs):
-#         return self.architecture.architecture(obs)
-#
-#     def parameters(self):
-#         return [*self.architecture.parameters()]
-#
-#     @property
-#     def obs_shape(self):
-#         return self.architecture.input_shape
-#
-#     @property
-#     def action_shape(self):
-#         return self.architecture.output_shape
 
 class EnsembleMLP(nn.Module):
     def __init__(self, modelA, modelB):

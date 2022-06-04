@@ -56,11 +56,10 @@ min_action = action_spec.minimum.copy()
 loc_action = (max_action + min_action) / 2
 scale_action = (max_action - min_action) / 2
 
-
 action_space = act_space(max_action, min_action, action_dim)
 
 # Agent
-actor_architecture = Gaussian_MLP(policy_net_shape[0], nn.LeakyReLU, input_dim, action_dim, action_space, device=device)
+actor_architecture = MLP(policy_net_shape, nn.LeakyReLU, input_dim, action_dim)
 critic_architecture = EnsembleMLP(MLP(Q_net_shape, nn.LeakyReLU, input_dim + action_dim, 1), MLP(Q_net_shape, nn.LeakyReLU, input_dim + action_dim, 1))
 agent = SAC(actor=Actor(actor_architecture, MultiVariateGaussianDiagonalCovariance(action_dim, torch.tensor(scale_action)), device=device, action_space=action_space), critic=Critic(critic_architecture, device=device), critic_target=Critic(critic_architecture, device=device),action_space=action_space)
 
