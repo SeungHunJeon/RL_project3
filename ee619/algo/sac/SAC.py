@@ -9,8 +9,8 @@ import torch.nn.functional as F
 
 class act_space():
     def __init__(self, high, low, shape):
-        self.high = torch.FloatTensor(high) * torch.ones(shape, dtype=torch.float32)
-        self.low = torch.FloatTensor(low) * torch.ones(shape, dtype=torch.float32)
+        self.high = torch.tensor(high) * torch.ones(shape)
+        self.low = torch.tensor(low) * torch.ones(shape)
         self.shape = shape
         self.loc_action = (self.high + self.low) / 2
         self.scale_action = (self.high - self.low) / 2
@@ -22,7 +22,7 @@ class SAC:
                  critic_target,
                  gamma=0.99,
                  lam=0.95,
-                 lr = 1e-4,
+                 lr = 1e-5,
                  tau = 0.005,
                  alpha = 0.2,
                  alpha_update = False,
@@ -53,6 +53,10 @@ class SAC:
         # criterion
         self.criterion = nn.MSELoss()
 
+        # learning rate (cosine annealing)
+        self.actor_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.actor_optimizer, T_max=50, eta_min=0)
+        self.critic_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer=self.critic_optimizer, T_max=50, eta_min=0)
+
         # alpha update
         if (self.alpha_update):
             self.target_entropy = -torch.prod(torch.Tensor(self.action_space.shape).to(self.device))
@@ -60,7 +64,7 @@ class SAC:
             self.alpha_optimizer = optim.Adam([self.alpha_], lr=lr)
 
     def observe(self, actor_obs):
-        self.actor_obs = torch.FloatTensor(actor_obs).to(self.device)
+        self.actor_obs = torch.from_numpy(actor_obs).float().to(self.device)
         self.actions, self.actions_log_prob = self.actor.sample(self.actor_obs)
 
         return self.actions.cpu().numpy()
@@ -68,13 +72,15 @@ class SAC:
     def update(self, memory, batch_size, training_num):
         transitions = memory.sample(batch_size=batch_size)
         mini_batch = memory.Transition(*zip(*transitions))
-        state_batch = torch.FloatTensor(np.array(mini_batch.state)).to(self.device)
-        action_batch = torch.FloatTensor(np.array(mini_batch.action)).to(self.device)
-        reward_batch = torch.FloatTensor(np.array(mini_batch.reward)).to(self.device).unsqueeze(-1)
-        next_state_batch = torch.FloatTensor(np.array(mini_batch.next_state)).to(self.device)
+        state_batch = torch.from_numpy(np.array(mini_batch.state)).float().to(self.device)
+        action_batch = torch.from_numpy(np.array(mini_batch.action)).float().to(self.device)
+        reward_batch = torch.from_numpy(np.array(mini_batch.reward)).float().to(self.device).unsqueeze(-1)
+        next_state_batch = torch.from_numpy(np.array(mini_batch.next_state)).float().to(self.device)
 
         with torch.no_grad():
             next_state_action, next_state_log_pi = self.actor.sample(next_state_batch)
+            next_state_action = next_state_action.to(self.device)
+            next_state_log_pi = next_state_log_pi.to(self.device)
             qf1_next_target, qf2_next_target = self.critic_target.architecture(next_state_batch, next_state_action)
             min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - self.alpha * next_state_log_pi
             next_q_value = reward_batch + self.gamma * (min_qf_next_target)
@@ -91,9 +97,9 @@ class SAC:
 
         # For actor
         pi, log_pi = self.actor.sample(state_batch)
-        qf1_pi, qf2_pi = self.critic.architecture(state_batch, pi)
+        qf1_pi, qf2_pi = self.critic.architecture(state_batch, pi.to(self.device))
         min_qf_pi = torch.min(qf1_pi, qf2_pi)
-        policy_loss = ((self.alpha * log_pi) - min_qf_pi).mean()
+        policy_loss = ((self.alpha * log_pi.to(self.device)) - min_qf_pi).mean()
 
         self.actor_optimizer.zero_grad()
         policy_loss.backward()
@@ -109,6 +115,9 @@ class SAC:
             self.alpha = self.alpha_.detach()
 
         soft_update(self.critic_target, self.critic, self.tau)
+
+        self.actor_optimizer.step()
+        self.critic_optimizer.step()
 
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item()
 

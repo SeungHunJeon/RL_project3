@@ -72,7 +72,7 @@ updates = 0
 total_steps = 0
 training_num = 0
 
-for update in range(100000):
+for update in range(10000):
     start = time.time()
     time_step = env.reset()
     reward_sum = 0
@@ -113,7 +113,7 @@ for update in range(100000):
     print('{:<40} {:>6}'.format("reward_sum: ", '{:0.10f}'.format(reward_sum)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('std: ')
-    # print(np.exp(actor.distribution.std.cpu().detach().numpy()))
+    print(np.exp(agent.actor.distribution.std.cpu().detach().numpy()))
     print('----------------------------------------------------\n')
 
 

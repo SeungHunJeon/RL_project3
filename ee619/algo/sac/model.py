@@ -47,12 +47,13 @@ class Actor(nn.Module):
         self.scale_action = self.action_space.scale_action.to(device)
 
     def sample(self, obs):
+
         logits = self.architecture.architecture(obs)
         actions, log_prob = self.distribution.sample(logits)
-        actions = self.loc_action + self.scale_action * actions
-        log_prob = log_prob.sum(-1, keepdim=True)
+        # actions = self.loc_action + self.scale_action * actions
+        # log_prob = log_prob.sum(-1, keepdim=True)
         # return actions.cpu().detach(), log_prob.cpu().detach()
-        return actions, log_prob
+        return actions.cpu().detach(), log_prob.cpu().detach()
 
     def evaluate(self, obs, actions):
         action_mean = self.architecture.architecture(obs)
@@ -172,14 +173,14 @@ class MultiVariateGaussianDiagonalCovariance(nn.Module):
     def __init__(self, dim, init_std):
         super(MultiVariateGaussianDiagonalCovariance, self).__init__()
         self.dim = dim
-        self.std = nn.Parameter(init_std)
+        self.std = nn.Parameter(init_std * torch.ones(dim))
         self.distribution = None
 
     def sample(self, logits):
-        self.distribution = Normal(logits, self.std)
+        self.distribution = Normal(logits, self.std.reshape(self.dim))
         samples = self.distribution.rsample()
-        samples = torch.tanh(samples)
-        log_prob = self.distribution.log_prob(samples)
+        # samples = torch.tanh(samples)
+        log_prob = self.distribution.log_prob(samples).sum(dim=-1, keepdim=True)
         samples = samples.type(torch.float32)
         log_prob = log_prob.type(torch.float32)
 
